@@ -1,0 +1,169 @@
+program cwars;
+{$DEFINE SRL_USE_REMOTEINPUT}
+{$I SRL-T/osr.simba}
+{$I WaspLib/osr.simba}
+{$DEFINE FORMS_V2}
+
+begin
+  Login.PlayerIndex := 0;
+end;
+
+const
+  BREAKAFTER  = 40;
+  BREAKFOR    = 7;
+
+var
+  RSW      : TRSWalker;
+  AB       : TAntiBan;
+  Pt       : TPoint;
+  State    : String;
+  LOBBY    : TBox        := [540, 179, 597, 258];
+  ZBROOM   : TBox        := [1004, 290, 1039, 325];
+  SBROOM   : TBox        := [1224, 509, 1257, 543];
+  ZWROOM   : TBox        := [417, 529, 509, 616];
+  SWROOM   : TBox        := [247, 671, 359, 753];
+  SDOOR1   : TPoint      := [1222, 526];
+  SDOOR2   : TPoint      := [1236, 508];
+  ZDOOR1   : TPoint      := [1038, 306];
+  ZDOOR2   : TPoint      := [1024, 325];
+  GPORT    : TPoint      := [548, 214];
+  GPCOLOR  : TCTS2Color  := CTS2(5010532, 1, 0.10, 0.10);
+
+  StartTickets    : Int32;
+  CurrentTickets  : Int32;
+  GainedTickets   : Int32;
+
+procedure CalculateTickets();
+begin
+  CurrentTickets := Inventory.CountItemStack('Castle wars ticket');
+  GainedTickets  := CurrentTickets - StartTickets;
+end;
+
+procedure Report(CurrentTickets: Int32; GainedTickets: Int32);
+begin
+  ClearDebug();
+  WriteLn('Runtime: ', SRL.MsToTime(GetTimeRunning, Time_Short));
+  WriteLn('Current tickets: ', ToStr(CurrentTickets));
+  WriteLn('Gained tickets: ', ToStr(GainedTickets));
+end;
+
+function FindObjectFromTile(Tile: TPoint; Color: TCTS2Color; Text: String): Boolean;
+var
+  Area: TRectangle;
+  TPA: TPointArray;
+  Box: TBox;
+begin
+  Area := RSW.GetTileMS(Tile);
+  Area := Area.Expand(10);
+  RSClient.Image.DrawRect(Area, clWhite);
+  Box := Area.Bounds();
+  Box.LimitTo(Mainscreen.Bounds);
+  Wait(100, 200);
+  SRL.FindColors(TPA, Color, Box);
+  RSClient.Image.Clear();
+  if (TPA.Len > 0) then
+    begin
+      Pt := SRL.rowp(Mouse.Position, TPA.Bounds);
+      Mouse.HumanMove(Pt);
+      if (Mainscreen.IsUpText(Text)) then Exit(True);
+      AB.RandomRotate();
+    end
+  else Exit(False);
+end;
+
+procedure JoinGame();
+begin
+  CalculateTickets();
+  Report(CurrentTickets, GainedTickets);
+  AB.DoAntiban();
+  if (FindObjectFromTile(GPORT, GPCOLOR, 'Enter')) then Mouse.Click(MOUSE_LEFT);
+end;
+
+procedure MapDownloader(const URL, Filename: string);
+var
+  Client: Int32;
+begin
+  Client := InitializeHTTPClient(False);
+  try
+    GetHTTPPageEx(Client, URL, Filename);
+  finally
+    FreeHTTPClient(Client);
+  end;
+end;
+
+procedure ExitSBROOM();
+var
+  Door : TPoint;
+  SDC  : TCTS2Color := CTS2(12227687, 4, 0.13, 3.75);
+begin
+  if (SRL.Dice(50)) then Door := SDOOR1
+  else Door := SDOOR2;
+  if (FindObjectFromTile(Door, SDC, 'Pass')) then Mouse.Click(MOUSE_LEFT);
+end;
+
+procedure ExitZBROOM();
+var
+  Door : TPoint;
+  ZDC  : TCTS2Color := CTS2(6385333, 1, 0.01, 0.01);
+begin
+  if (SRL.Dice(50)) then Door := ZDOOR1
+  else Door := ZDOOR2;
+  if (FindObjectFromTile(Door, ZDC, 'Pass')) then Mouse.Click(MOUSE_LEFT);
+end;
+
+function GetState(): String;
+var Position: TPoint;
+begin
+  Position := RSW.GetMyPos();
+  if LOBBY.Contains(Position)  then Exit('LOBBY');
+  if SWROOM.Contains(Position) then Exit('SWROOM');
+  if ZWROOM.Contains(Position) then Exit('ZWROOM');
+  if SBROOM.Contains(Position) then Exit('SBROOM');
+  if ZBROOM.Contains(Position) then Exit('ZBROOM');
+  Exit('INGAME');
+end;
+
+procedure TAntiban.DoLoseFocus();
+begin
+  Self.LoseFocus(SRL.NormalRange(3700,5000));
+end;
+
+procedure SetupAntiBan();
+begin
+  AB.AddTask(ONE_MINUTE  * 6,   @Antiban.RandomRightClick);
+  AB.AddTask(ONE_SECOND  * 45,  @Mouse.RandomMovement);
+  AB.AddTask(ONE_MINUTE  * 3,   @Antiban.RandomRotate);
+  AB.AddTask(ONE_MINUTE  * 6,   @Antiban.DoLoseFocus);
+  AB.AddBreak(BREAKAFTER * ONE_MINUTE, BREAKFOR * ONE_MINUTE);
+end;
+
+procedure InitiateScript();
+begin
+  if (not FileExists(AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png')) then
+  MapDownloader('https://i.imgur.com/VlDMMx0.png', AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png');
+  RSW.Setup('cwars.png');
+  SetupAntiBan();
+  if not RSClient.IsLoggedIn() then Login.LoginPlayer();
+  WaitUntil(Inventory.Open(), 500, 10000);
+  StartTickets := Inventory.CountItemStack('Castle wars ticket');
+  CalculateTickets();
+end;
+
+begin
+  InitiateScript();
+  repeat
+    begin
+      if not RSClient.IsLoggedIn then Login.LoginPlayer;
+      State := GetState();
+      case State of
+        'LOBBY'  : JoinGame();
+        'SWROOM' : AB.DoAntiban(False, False);
+        'ZWROOM' : AB.DoAntiban(False, False);
+        'SBROOM' : ExitSBROOM();
+        'ZBROOM' : ExitZBROOM();
+        'INGAME' : AB.DoAntiban(False, False);
+      end;
+      Wait(2000, 4000);
+    end;
+  until false;
+end.
