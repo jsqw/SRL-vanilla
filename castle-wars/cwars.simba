@@ -140,7 +140,7 @@ procedure InitiateScript();
 begin
   if (not FileExists(AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png')) then
   MapDownloader('https://i.imgur.com/VlDMMx0.png', AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png');
-  RSW.Setup('cwars.png');
+  RSW.Setup('cwars'');
   SetupAntiBan();
   if not RSClient.IsLoggedIn() then Login.LoginPlayer();
   WaitUntil(Inventory.Open(), 500, 10000);
