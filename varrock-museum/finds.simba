@@ -8,8 +8,8 @@ begin
 end;
 
 const
-  BREAKAFTER  = 44;
-  BREAKFOR    = 12;
+  BREAKAFTER  = 40;
+  BREAKFOR    = 8;
 
 var
   RSW          : TRSWalker;
@@ -221,10 +221,8 @@ begin
 end;
 
 procedure UseLamp();
-// slayer  : 205, 203
-// farming : 242, 203
-// herblore: 275, 165
-// hunter  : 348, 238
+// slayer  : 205, 203 | farming : 242, 203
+// herblore: 275, 165 | hunter  : 348, 238
 var
   SkillButton: TPoint := [205, 203];
   OkButton: TPoint := [260, 276];
