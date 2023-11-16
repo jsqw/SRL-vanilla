@@ -1,0 +1,169 @@
+program hosidiuscooker;
+{$DEFINE SRL_USE_REMOTEINPUT}
+{$I WaspLib/osr.simba}
+{$DEFINE FORMS_V2}
+
+begin
+  // THIS GETS YOUR PLAYER FROM credentials.simba
+  // FIRST ACCOUNT: 0
+  Login.PlayerIndex := 0;
+end;
+
+var
+  // DEFINE FOOD TO COOK HERE, CASE SENSITIVE
+  // EXAMPLE: 'Raw salmon'
+  FoodName: String := 'Raw salmon';
+  RawFood: TRSItem;
+  RSW: TRSWalker;
+  Timer: TStopwatch;
+  StartXP: Int32;
+  CurrentXP: Int32;
+  GainedXP: Int32 := 0;
+
+procedure PauseTimer(Task: PBreakTask);
+var T: PBreakTask;
+begin
+  Timer.Pause;
+  T := Task;
+end;
+
+procedure ResumeTimer(Task: PBreakTask);
+var T: PBreakTask;
+begin
+  Timer.Resume;
+  T := Task;
+end;
+
+procedure PrintProgress();
+begin
+  ClearDebug();
+  WriteLn("| Hosidius cooker by n0ll   |");
+  WriteLn("| version 0.1               |");
+  WriteLn('| --------------------------|');
+  WriteLn('| Runtime    : ', SRL.MsToTime(GetTimeRunning, Time_Short));
+  WriteLn('| Experience : ', Round(GainedXP/1000, 2), ' K');
+  WriteLn('| Exp/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
+  WriteLn('| --------------------------|');
+end;
+
+// A custom Keyboard version of Antiban.RandomRotate()
+// Rotating with mouse3 doesn't work well with RuneLite
+procedure KeyboardRotate();
+var
+  Arrow: Integer;
+  Duration: Int64;
+begin
+  if SRL.Dice(50) then
+    Arrow := $25
+  else
+    Arrow := $27;
+  Duration := SRL.NormalRange(500, 1500);
+  Keyboard.KeyDown(Arrow);
+  Sleep(Duration);
+  Keyboard.KeyUp(Arrow);
+end;
+
+procedure TAntiban.DoLoseFocus();
+Var T: Int32;
+begin
+  T := SRL.NormalRange(800,3500);
+  Self.DebugLn('Losing focus for '+SRL.MsToTime(T, Time_Short));
+  Self.LoseFocus(T);
+end;
+
+procedure SetupAntiBan();
+begin
+  Antiban.Skills := [ERSSKILL.COOKING, ERSSKILL.TOTAL];
+  Antiban.AddTask(ONE_MINUTE*2,   @Mouse.RandomMovement);
+  Antiban.AddTask(ONE_MINUTE*5,   @Antiban.HoverMSPlayers);
+  Antiban.AddTask(ONE_MINUTE*3,   @Antiban.DoLoseFocus);
+  Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
+  Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
+  Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
+  Antiban.AddBreak(ONE_MINUTE * 5, ONE_SECOND*10, 0.2, 0);
+  Antiban.AddBreak(33 * ONE_MINUTE, 9 * ONE_MINUTE);
+  Antiban.AddBreak(10 * ONE_HOUR, 8 * ONE_HOUR);
+  Antiban.OnStartBreak := @PauseTimer;
+  Antiban.OnFinishBreak := @ResumeTimer;
+end;
+
+procedure InitiateScript();
+begin
+  RSW.Setup('world');
+  SetupAntiBan();
+  if not RSClient.IsLoggedIn() then Login.LoginPlayer();
+  WaitUntil(RSClient.IsLoggedIn(), 100, 10000);
+  StartXP := XPBar.Read();
+  RawFood := FoodName;
+  Timer.Start();
+end;
+
+procedure CalculateXP();
+var t: Int32;
+begin
+  CurrentXP := XPBar.Read();
+  t         := GainedXP;
+  GainedXP  := CurrentXP - StartXP;
+  if GainedXP > t then Timer.Reset();
+  if Timer.ElapsedTime > 300000 then TerminateScript('No Gained XP in 5 minutes!')
+end;
+
+procedure Cook();
+var
+  OvenTile: TPoint := [2102, 1972];
+  Rect: TRectangle;
+  Pt: TPoint;
+begin
+  Rect := RSW.GetTileMS(OvenTile).Expand(-2);
+  Pt := SRL.rowp(Rect.Mean(), Rect.Bounds());
+  Mouse.HumanMove(Pt);
+  if Mainscreen.IsUpText('Cook') then
+    Mouse.Click(MOUSE_LEFT)
+  else
+    Exit();
+  WaitUntil(Make.IsOpen(), 200, 8000);
+  Make.Select(FoodName, Make.QUANTITY_ALL, True);
+  WaitUntil((not Inventory.ContainsItem(RawFood)), 200, 75000);
+  PrintProgress();
+end;
+
+procedure Restock();
+var
+  BankTile: TPoint := [2092, 2000];
+  Rect: TRectangle;
+  Pt: TPoint;
+  BankItem: TRSBankItem := [RawFood, Bank.QUANTITY_ALL, False];
+begin
+  Rect := RSW.GetTileMS(BankTile, 2).Expand(-2);
+  Pt := SRL.rowp(Rect.Mean(), Rect.Bounds());
+  Mouse.HumanMove(Pt);
+  if Mainscreen.IsUpText('Bank') then
+    Mouse.Click(MOUSE_LEFT)
+  else
+    Exit();
+  WaitUntil(Bank.IsOpen(), 200, 8000);
+  Bank.DepositAll();
+  WaitEx(250, 25);
+  if Bank.ContainsItem(RawFood) then
+    Bank.WithdrawItem(BankItem, False)
+  else TerminateScript('Out of raw food!');
+  WaitEx(250, 25);
+  Bank.Close(20);
+  WaitEx(250, 25);
+end;
+
+begin
+  InitiateScript();
+  repeat
+    begin
+      CalculateXP();
+      Antiban.DoAntiban();
+      if (not RSClient.IsLoggedIn()) then Login.LoginPlayer();
+      if Inventory.ContainsItem(RawFood) then
+        Cook()
+      else
+        Restock();
+      WaitEx(250, 25);
+    end;
+  until false;
+end.
