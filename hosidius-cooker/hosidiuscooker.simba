@@ -12,7 +12,7 @@ end;
 var
   // DEFINE FOOD TO COOK HERE, CASE SENSITIVE
   // EXAMPLE: 'Raw salmon'
-  FoodName: String := 'Raw salmon';
+  FoodName: String := 'Raw bass';
   RawFood: TRSItem;
   RSW: TRSWalker;
   Timer: TStopwatch;
@@ -110,7 +110,7 @@ end;
 
 procedure Cook();
 var
-  OvenTile: TPoint := [2102, 1972];
+  OvenTile: TPoint := [2100, 1972];
   Rect: TRectangle;
   Pt: TPoint;
 begin
