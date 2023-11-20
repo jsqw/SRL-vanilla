@@ -1,0 +1,194 @@
+program swslave;
+{$I SRL-T/osr.simba}
+{$I WaspLib/osr.simba}
+{$DEFINE FORMS_V2}
+
+begin
+  Login.PlayerIndex := 0;
+end;
+
+const
+  BREAKAFTER  = 44;
+  BREAKFOR    = 12;
+
+var
+  RSW          : TRSWalker;
+  State        : String;
+  PORTAL_LOC   : TPoint;
+  PORTAL_COL   : TCTS2Color;
+  BASE_BOX     : TBox;
+
+procedure SetupAntiBan();
+begin
+  Antiban.Skills := [ERSSKILL.TOTAL];
+  Antiban.AddTask(ONE_MINUTE  * 4,   @Antiban.RandomRightClick);
+  Antiban.AddTask(ONE_SECOND  * 45,  @Mouse.RandomMovement);
+  Antiban.AddTask(ONE_MINUTE  * 5,   @Antiban.RandomRotate);
+  Antiban.AddTask(ONE_MINUTE  * 15,  @Antiban.HoverSkills);
+  Antiban.AddTask(ONE_MINUTE  * 4,   @Antiban.LoseFocus);
+  Antiban.AddBreak(ONE_MINUTE * 5, ONE_SECOND*10, 0.2, 0);
+  Antiban.AddBreak(BREAKAFTER * ONE_MINUTE, BREAKFOR * ONE_MINUTE);
+end;
+
+procedure InitiateScript();
+begin
+  RSW.Setup('world');
+  SRL.Setup();
+  SetupAntiBan();
+  if not RSClient.IsLoggedIn then Login.LoginPlayer;
+end;
+
+function IsChallengeScreenOpen: Boolean;
+var CHALLENGEBOX : TBox := [92, 116, 426, 257];
+begin
+  Result := SRL.CountColor(CTS2(2070783, 1, 0.01, 0.01), CHALLENGEBOX) > 3000;
+end;
+
+procedure ChallengeOpponent;
+var Pt: TPoint;
+begin
+  Pt := SRL.rowp(Mouse.Position(), Mainscreen.GetPlayerBox());
+  Mouse.HumanMove(Pt);
+  Mouse.Click(MOUSE_RIGHT);
+  Wait(125, 250);
+  ChooseOption.Select('Challenge');
+  WaitUntil(IsChallengeScreenOpen, 500, 30000);
+end;
+
+procedure JoinChallengeRoom();
+var
+  Barr : TPoint:= [4625, 5072];
+  TPA  : TPointArray;
+  Area : TRectangle;
+  Pt   : TPoint;
+begin
+  Antiban.DoAntiban();
+  RSW.WalkBlind([4622, 5072]);
+  Area := RSW.GetTileMS(Barr);
+  Area := Area.Expand(12);
+  SRL.FindColors(TPA, CTS2(9390990, 13, 0.05, 0.91), Area.Bounds);
+  if TPA.Len < 1 then
+    begin
+      WriteLn('Barrier not visible, rotating camera angle...');
+      Antiban.RandomRotate();
+      Exit();
+    end;
+  Pt := SRL.rowp(Mouse.Position, TPA.Bounds);
+  Mouse.HumanMove(Pt);
+  if not Mainscreen.IsUpText('Barrier') then Exit;
+  Wait(25, 125);
+  Mouse.Click(MOUSE_LEFT);
+  Wait(2000, 3500);
+end;
+
+
+procedure SetupTeams;
+var
+  Pos: TPoint;
+  SaradominPortal : TPoint := [4316, 4820];
+  ZamorakPortal   : TPoint := [4832, 4764];
+  SaradominPortalC: TCTS2Color := CTS2(9267274, 5, 0.14, 0.49);
+  ZamorakPortalC  : TCTS2Color := CTS2(2764639, 8, 0.05, 0.30);
+  SARA_SPAWN   : TBox := [4290, 4800, 4318, 4840];
+  ZAMMY_SPAWN  : TBox := [4830, 4744, 4858, 4784];
+
+begin
+  Pos := RSW.GetMyPos();
+  if SARA_SPAWN.Contains(Pos) then
+    begin
+      WriteLn('We are in Saradomin base, setting up Sara info..');
+      PORTAL_LOC    := SaradominPortal;
+      PORTAL_COL    := SaradominPortalC;
+      BASE_BOX      := SARA_SPAWN;
+    end
+  else if ZAMMY_SPAWN.Contains(Pos) then
+    begin
+      WriteLn('We are in Zamorak base, setting up Zammy info..');
+      PORTAL_LOC    := ZamorakPortal;
+      PORTAL_COL    := ZamorakPortalC;
+      BASE_BOX      := ZAMMY_SPAWN;
+    end;
+end;
+
+procedure ConfirmChallenge();
+begin
+  Mouse.HumanMove(SRL.rowp(Mouse.Position(), [206, 223, 311, 243]));
+  Wait(25, 225);
+  Mouse.Click(MOUSE_LEFT);
+  Wait(7000, 8000);
+  SetupTeams();
+end;
+
+function TimeToForfeit(): Boolean;
+var S: String := 'Time remaining: 12:30';
+begin
+  if Chat.GetMessage(6) = S then Exit(True);
+  if Chat.GetMessage(7) = S then Exit(True);
+  Exit(False);
+end;
+
+procedure ClickPortal();
+var
+  TPA  : TPointArray;
+  Area : TRectangle;
+  Pt   : TPoint;
+begin
+  Area := RSW.GetTileMS(PORTAL_LOC);
+  Area := Area.Expand(12);
+  SRL.FindColors(TPA, PORTAL_COL, Area.Bounds);
+  if TPA.Len < 1 then
+    begin
+      WriteLn('Portal not visible, rotating camera angle...');
+      Antiban.RandomRotate();
+      Exit();
+    end;
+  Pt := SRL.rowp(Mouse.Position, TPA.Bounds);
+  Mouse.HumanMove(Pt);
+  if not Mainscreen.IsUpText('Leave') then
+    begin
+      WriteLn('Uptext not visible, rotating camera angle...');
+      Antiban.RandomRotate();
+      Exit();
+    end;
+  Wait(25, 125);
+  Mouse.Click(MOUSE_LEFT);
+  Wait(4000, 4500);
+  Chat.ClickOption('Yes.', True);
+  Wait(2000, 2500);
+end;
+
+function GetState(): String;
+var
+  SW_LOBBY: TPointArray := [[4524, 4976], [4653, 4971], [4693, 5050], [4626, 5052], [4627, 5101], [4647, 5118], [4499, 5123], [4456, 5060]];
+  CHALL_ROOM: TBox := [4626, 5060, 4658, 5088];
+  Pos: TPoint;
+begin
+  if (not RSClient.IsLoggedIn()) then Exit('LOGGED_OUT');
+  if Chat.HasContinue then Chat.ClickContinue(True);
+  Pos := RSW.GetMyPos();
+  if IsChallengeScreenOpen() then Exit('ACCEPT_CHALLENGE');
+  if CHALL_ROOM.Contains(Pos) then Exit('CHALLENGE_OPP');
+  if SW_LOBBY.Bounds().Contains(Pos) then Exit('JOIN_CHALL_AREA');
+  if (BASE_BOX.Contains(Pos) and TimeToForfeit) then Exit('FORFEIT_GAME');
+  if (BASE_BOX.Contains(Pos)) then Exit('WAIT_STATE');
+  Exit('UNKNOWN');
+end;
+
+begin
+  InitiateScript();
+  repeat
+    begin
+      if not RSClient.IsLoggedIn then Login.LoginPlayer;
+      State := GetState();
+      WriteLn('STATE: ', State);
+      case State of
+        'ACCEPT_CHALLENGE'   : ConfirmChallenge();
+        'CHALLENGE_OPP'      : ChallengeOpponent();
+        'JOIN_CHALL_AREA'    : JoinChallengeRoom();
+        'FORFEIT_GAME'       : ClickPortal();
+        'WAIT_STATE'         : Antiban.DoAntiban(False, False);
+      end;
+      Wait(1250, 2500);
+    end;
+  until false;
+end.
