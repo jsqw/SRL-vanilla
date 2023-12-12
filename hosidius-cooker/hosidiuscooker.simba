@@ -4,14 +4,10 @@ program hosidiuscooker;
 {$DEFINE FORMS_V2}
 
 begin
-  // THIS GETS YOUR PLAYER FROM credentials.simba
-  // FIRST ACCOUNT: 0
   Login.PlayerIndex := 0;
 end;
 
 var
-  // DEFINE FOOD TO COOK HERE, CASE SENSITIVE
-  // EXAMPLE: 'Raw salmon'
   FoodName: String := 'Raw bass';
   RawFood: TRSItem;
   RSW: TRSWalker;
@@ -37,13 +33,13 @@ end;
 procedure PrintProgress();
 begin
   ClearDebug();
-  WriteLn("| Hosidius cooker by n0ll   |");
-  WriteLn("| version 0.1               |");
-  WriteLn('| --------------------------|');
+  WriteLn('| Hosidius Cooker      by n0ll |');
+  WriteLn('| version 0.2                  |');
+  WriteLn('|------------------------------|');
   WriteLn('| Runtime    : ', SRL.MsToTime(GetTimeRunning, Time_Short));
-  WriteLn('| Experience : ', Round(GainedXP/1000, 2), ' K');
-  WriteLn('| Exp/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
-  WriteLn('| --------------------------|');
+  WriteLn('| XP Gained  : ', Round(GainedXP/1000, 2), ' K');
+  WriteLn('| XP/hr      : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
+  WriteLn('|------------------------------|');
 end;
 
 // A custom Keyboard version of Antiban.RandomRotate()
@@ -80,9 +76,8 @@ begin
   Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
   Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
   Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
-  Antiban.AddBreak(ONE_MINUTE * 5, ONE_SECOND*10, 0.2, 0);
-  Antiban.AddBreak(33 * ONE_MINUTE, 9 * ONE_MINUTE);
-  Antiban.AddBreak(10 * ONE_HOUR, 8 * ONE_HOUR);
+  Antiban.AddBreak(40* ONE_MINUTE, 8 * ONE_MINUTE);
+  Antiban.AddBreak(14 * ONE_HOUR, 6 * ONE_HOUR);
   Antiban.OnStartBreak := @PauseTimer;
   Antiban.OnFinishBreak := @ResumeTimer;
 end;
@@ -91,7 +86,8 @@ procedure InitiateScript();
 begin
   RSW.Setup('world');
   SetupAntiBan();
-  if not RSClient.IsLoggedIn() then Login.LoginPlayer();
+  if (not RSClient.IsLoggedIn()) then 
+    Login.LoginPlayer();
   WaitUntil(RSClient.IsLoggedIn(), 100, 10000);
   StartXP := XPBar.Read();
   RawFood := FoodName;
@@ -104,8 +100,10 @@ begin
   CurrentXP := XPBar.Read();
   t         := GainedXP;
   GainedXP  := CurrentXP - StartXP;
-  if GainedXP > t then Timer.Reset();
-  if Timer.ElapsedTime > 300000 then TerminateScript('No Gained XP in 5 minutes!')
+  if (GainedXP > t) then 
+    Timer.Reset();
+  if (Timer.ElapsedTime > 300000) then 
+    TerminateScript('No Gained XP in 5 minutes!')
 end;
 
 procedure Cook();
@@ -146,7 +144,8 @@ begin
   WaitEx(250, 25);
   if Bank.ContainsItem(RawFood) then
     Bank.WithdrawItem(BankItem, False)
-  else TerminateScript('Out of raw food!');
+  else 
+    TerminateScript('Out of raw food!');
   WaitEx(250, 25);
   Bank.Close(20);
   WaitEx(250, 25);
@@ -158,7 +157,8 @@ begin
     begin
       CalculateXP();
       Antiban.DoAntiban();
-      if (not RSClient.IsLoggedIn()) then Login.LoginPlayer();
+      if (not RSClient.IsLoggedIn()) then 
+        Login.LoginPlayer();
       if Inventory.ContainsItem(RawFood) then
         Cook()
       else
