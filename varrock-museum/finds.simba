@@ -14,9 +14,7 @@ const
 var
   RSW          : TRSWalker;
   Timer        : TStopwatch;
-  StartXP      : Int32;
-  CurrentXP    : Int32;
-  GainedXP     : Int32        := 0;
+  StartXP, CurrentXP, GainedXP: Int32;
   State        : String;
   DropArray    : TRSItemArray := ['Broken arrow', 'Broken glass', 'Iron dagger',
                                   'Uncut jade', 'Bones', 'Bowl', 'Pot',
@@ -26,9 +24,6 @@ var
   DepositArray : TRSItemArray := ['Pottery', 'Jewellery', 'Old chipped vase',
                                   'Arrowheads'];
 
-
-// A custom Keyboard version of Antiban.RandomRotate()
-// Rotating with mouse3 doesn't work well with RuneLite
 procedure KeyboardRotate();
 var
   Arrow: Integer;
@@ -72,7 +67,6 @@ procedure PrintProgress();
 begin
   ClearDebug();
   CalculateXP();
-  WriteLn('| ~ varrock museumfindcleaner ~ |');
   WriteLn('| ------------------------------|');
   WriteLn('| Time running   : ', SRL.MsToTime(GetTimeRunning, Time_Short));
   WriteLn('| Gained XP      : ', Round((GainedXP/1000), 2), ' K');
@@ -98,7 +92,8 @@ begin
   Box  := Rect.Bounds().Expand(-6);
   Pt   := SRL.Rowp(Mouse.Position(), Box);
   Mouse.HumanMove(Pt);
-  if not Mainscreen.IsUpText('rocks') then Exit(False)
+  if (not Mainscreen.IsUpText('rocks')) then 
+    Exit(False)
   else
     begin
       Mouse.Click(MOUSE_LEFT);
@@ -113,7 +108,7 @@ var
   CS: String;
 begin
   CS := Chat.GetChatTitle;
-  Result := CS = S;
+  Result := (CS = S);
 end;
 
 function UseCleaningTable(): Boolean;
@@ -127,7 +122,8 @@ begin
   Box  := Rect.Bounds();
   Pt   := SRL.Rowp(Mouse.Position(), Box);
   Mouse.HumanMove(Pt);
-  if not Mainscreen.IsUpText('table') then Exit(False)
+  if (not Mainscreen.IsUpText('table')) then 
+    Exit(False)
   else
     begin
       Mouse.Click(MOUSE_LEFT);
@@ -147,7 +143,8 @@ begin
   Box  := Rect.Bounds().Expand(-6);
   Pt   := SRL.Rowp(Mouse.Position(), Box);
   Mouse.HumanMove(Pt);
-  if not Mainscreen.IsUpText('crate') then Exit(False)
+  if (not Mainscreen.IsUpText('crate')) then 
+    Exit(False)
   else
     begin
       Mouse.Click(MOUSE_LEFT);
@@ -192,7 +189,8 @@ begin
   RSW.Setup('world');
   SRL.Setup();
   SetupAntiBan();
-  if not RSClient.IsLoggedIn then Login.LoginPlayer;
+  if (not RSClient.IsLoggedIn) then 
+    Login.LoginPlayer();
   WaitUntil(RSClient.IsLoggedIn, 100, 10000);
   StartXP := XPBar.Read;
   Timer.Start();
@@ -205,18 +203,21 @@ begin
       Chat.ClickOption('Yes, place all my finds in the crate.');
       WaitUntil(not Inventory.ContainsAny(DepositArray), 250, 22000);
     end
-  else ClickStorageCrate();
+  else 
+    ClickStorageCrate();
 end;
 
 function GetState: String;
 begin
-  if Inventory.ContainsItem('Antique lamp') then Exit('USE_LAMP');
-  if ShouldDeposit then Exit('DEPOSIT_ITEMS');
-  if Inventory.ContainsAny(DropArray) then Exit('DROP_JUNK');
+  if Inventory.ContainsItem('Antique lamp') then 
+    Exit('USE_LAMP');
+  if ShouldDeposit then 
+    Exit('DEPOSIT_ITEMS');
+  if Inventory.ContainsAny(DropArray) then 
+    Exit('DROP_JUNK');
   if Inventory.ContainsItem('Uncleaned find') then
-    begin
-      if Inventory.IsFull() then Exit('CLEAN_FINDS')
-    end;
+    if Inventory.IsFull() then 
+      Exit('CLEAN_FINDS')
   Exit('GET_UNIDS');
 end;
 
@@ -243,11 +244,11 @@ end;
 
 procedure CleanFinds();
 begin
-  if not RSClient.IsLoggedIn() then Login.LoginPlayer();
+  if (not RSClient.IsLoggedIn()) then 
+    Login.LoginPlayer();
   Antiban.DoAntiban();
   State := GetState();
   PrintProgress();
-  WriteLn('State: ', State);
   case State of
     'USE_LAMP'       : UseLamp();
     'DEPOSIT_ITEMS'  : DepositItems();

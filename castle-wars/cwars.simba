@@ -56,7 +56,7 @@ begin
   Area := Area.Expand(10);
   RSClient.Image.DrawRect(Area, clWhite);
   Box := Area.Bounds();
-  Box.LimitTo(Mainscreen.Bounds);
+  Box.LimitTo(Mainscreen.Bounds());
   Wait(100, 200);
   SRL.FindColors(TPA, Color, Box);
   RSClient.Image.Clear();
@@ -64,10 +64,12 @@ begin
     begin
       Pt := SRL.rowp(Mouse.Position, TPA.Bounds);
       Mouse.HumanMove(Pt);
-      if (Mainscreen.IsUpText(Text)) then Exit(True);
+      if (Mainscreen.IsUpText(Text)) then 
+        Exit(True);
       AB.RandomRotate();
     end
-  else Exit(False);
+  else 
+    Exit(False);
 end;
 
 procedure JoinGame();
@@ -75,7 +77,8 @@ begin
   CalculateTickets();
   Report(CurrentTickets, GainedTickets);
   AB.DoAntiban();
-  if (FindObjectFromTile(GPORT, GPCOLOR, 'Enter')) then Mouse.Click(MOUSE_LEFT);
+  if (FindObjectFromTile(GPORT, GPCOLOR, 'Enter')) then 
+    Mouse.Click(MOUSE_LEFT);
 end;
 
 procedure MapDownloader(const URL, Filename: string);
@@ -105,20 +108,28 @@ var
   Door : TPoint;
   ZDC  : TCTS2Color := CTS2(6385333, 1, 0.01, 0.01);
 begin
-  if (SRL.Dice(50)) then Door := ZDOOR1
-  else Door := ZDOOR2;
-  if (FindObjectFromTile(Door, ZDC, 'Pass')) then Mouse.Click(MOUSE_LEFT);
+  if (SRL.Dice(50)) then 
+    Door := ZDOOR1
+  else 
+    Door := ZDOOR2;
+  if (FindObjectFromTile(Door, ZDC, 'Pass')) then 
+    Mouse.Click(MOUSE_LEFT);
 end;
 
 function GetState(): String;
 var Position: TPoint;
 begin
   Position := RSW.GetMyPos();
-  if LOBBY.Contains(Position)  then Exit('LOBBY');
-  if SWROOM.Contains(Position) then Exit('SWROOM');
-  if ZWROOM.Contains(Position) then Exit('ZWROOM');
-  if SBROOM.Contains(Position) then Exit('SBROOM');
-  if ZBROOM.Contains(Position) then Exit('ZBROOM');
+  if LOBBY.Contains(Position) then 
+    Exit('LOBBY');
+  if SWROOM.Contains(Position) then 
+    Exit('SWROOM');
+  if ZWROOM.Contains(Position) then 
+    Exit('ZWROOM');
+  if SBROOM.Contains(Position) then 
+    Exit('SBROOM');
+  if ZBROOM.Contains(Position) then 
+    Exit('ZBROOM');
   Exit('INGAME');
 end;
 
@@ -139,10 +150,11 @@ end;
 procedure InitiateScript();
 begin
   if (not FileExists(AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png')) then
-  MapDownloader('https://i.imgur.com/VlDMMx0.png', AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png');
+    MapDownloader('https://i.imgur.com/VlDMMx0.png', AppPath+'\Includes\WaspLib\osr\walker\maps\cwars.png');
   RSW.Setup('cwars');
   SetupAntiBan();
-  if not RSClient.IsLoggedIn() then Login.LoginPlayer();
+  if (not RSClient.IsLoggedIn()) then 
+    Login.LoginPlayer();
   WaitUntil(Inventory.Open(), 500, 10000);
   StartTickets := Inventory.CountItemStack('Castle wars ticket');
   CalculateTickets();
@@ -152,7 +164,8 @@ begin
   InitiateScript();
   repeat
     begin
-      if not RSClient.IsLoggedIn then Login.LoginPlayer;
+      if (not RSClient.IsLoggedIn) then 
+        Login.LoginPlayer();
       State := GetState();
       case State of
         'LOBBY'  : JoinGame();
@@ -162,7 +175,7 @@ begin
         'ZBROOM' : ExitZBROOM();
         'INGAME' : AB.DoAntiban(False, False);
       end;
-      Wait(2000, 4000);
+      WaitEx(1000, 250);
     end;
   until false;
 end.

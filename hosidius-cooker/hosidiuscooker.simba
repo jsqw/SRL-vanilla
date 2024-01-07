@@ -12,9 +12,7 @@ var
   RawFood: TRSItem;
   RSW: TRSWalker;
   Timer: TStopwatch;
-  StartXP: Int32;
-  CurrentXP: Int32;
-  GainedXP: Int32 := 0;
+  StartXP, CurrentXP, GainedXP: Int32;
 
 procedure PauseTimer(Task: PBreakTask);
 var T: PBreakTask;
@@ -33,8 +31,6 @@ end;
 procedure PrintProgress();
 begin
   ClearDebug();
-  WriteLn('| Hosidius Cooker      by n0ll |');
-  WriteLn('| version 0.2                  |');
   WriteLn('|------------------------------|');
   WriteLn('| Runtime    : ', SRL.MsToTime(GetTimeRunning, Time_Short));
   WriteLn('| XP Gained  : ', Round(GainedXP/1000, 2), ' K');
@@ -42,8 +38,6 @@ begin
   WriteLn('|------------------------------|');
 end;
 
-// A custom Keyboard version of Antiban.RandomRotate()
-// Rotating with mouse3 doesn't work well with RuneLite
 procedure KeyboardRotate();
 var
   Arrow: Integer;
