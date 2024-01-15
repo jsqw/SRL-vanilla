@@ -1,4 +1,4 @@
-program hosidiuscooker;
+program cooker;
 {$DEFINE SRL_USE_REMOTEINPUT}
 {$I WaspLib/osr.simba}
 {$DEFINE FORMS_V2}
@@ -8,11 +8,14 @@ begin
 end;
 
 var
+  // SUPPORTED LOCATIONS: TRAWLER & HOSIDIUS
+  Location: String := 'TRAWLER';
   FoodName: String := 'Raw bass';
   RawFood: TRSItem;
   RSW: TRSWalker;
   Timer: TStopwatch;
   StartXP, CurrentXP, GainedXP: Int32;
+  OvenTile, BankTile: TPoint;
 
 procedure PauseTimer(Task: PBreakTask);
 var T: PBreakTask;
@@ -28,14 +31,27 @@ begin
   T := Task;
 end;
 
+procedure CalculateXP();
+var t: Int32;
+begin
+  CurrentXP := XPBar.Read();
+  t         := GainedXP;
+  GainedXP  := CurrentXP - StartXP;
+  if (GainedXP > t) then
+    Timer.Reset();
+  if (Timer.ElapsedTime > 300000) then
+    TerminateScript('No Gained XP in 5 minutes!')
+end;
+
 procedure PrintProgress();
 begin
   ClearDebug();
-  WriteLn('|------------------------------|');
-  WriteLn('| Runtime    : ', SRL.MsToTime(GetTimeRunning, Time_Short));
-  WriteLn('| XP Gained  : ', Round(GainedXP/1000, 2), ' K');
-  WriteLn('| XP/hr      : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
-  WriteLn('|------------------------------|');
+  CalculateXP();
+  WriteLn('| --------------------------|');
+  WriteLn('| Runtime   : ', SRL.MsToTime(GetTimeRunning, Time_Short));
+  WriteLn('| XP Gained : ', Round(GainedXP/1000, 2), ' K');
+  WriteLn('| XP/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
+  WriteLn('| --------------------------|');
 end;
 
 procedure KeyboardRotate();
@@ -47,7 +63,7 @@ begin
     Arrow := $25
   else
     Arrow := $27;
-  Duration := SRL.NormalRange(500, 1500);
+  Duration := SRL.NormalRange(300, 1900);
   Keyboard.KeyDown(Arrow);
   Sleep(Duration);
   Keyboard.KeyUp(Arrow);
@@ -70,8 +86,8 @@ begin
   Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
   Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
   Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
-  Antiban.AddBreak(40* ONE_MINUTE, 8 * ONE_MINUTE);
-  Antiban.AddBreak(14 * ONE_HOUR, 6 * ONE_HOUR);
+  Antiban.AddBreak(40 * ONE_MINUTE, 8 * ONE_MINUTE);
+  Antiban.AddBreak(12 * ONE_HOUR, 6 * ONE_HOUR);
   Antiban.OnStartBreak := @PauseTimer;
   Antiban.OnFinishBreak := @ResumeTimer;
 end;
@@ -80,29 +96,28 @@ procedure InitiateScript();
 begin
   RSW.Setup('world');
   SetupAntiBan();
-  if (not RSClient.IsLoggedIn()) then 
+  if not RSClient.IsLoggedIn() then
     Login.LoginPlayer();
   WaitUntil(RSClient.IsLoggedIn(), 100, 10000);
   StartXP := XPBar.Read();
   RawFood := FoodName;
   Timer.Start();
-end;
-
-procedure CalculateXP();
-var t: Int32;
-begin
-  CurrentXP := XPBar.Read();
-  t         := GainedXP;
-  GainedXP  := CurrentXP - StartXP;
-  if (GainedXP > t) then 
-    Timer.Reset();
-  if (Timer.ElapsedTime > 300000) then 
-    TerminateScript('No Gained XP in 5 minutes!')
+  if (Location = 'TRAWLER') then
+    begin
+      OvenTile := [6040, 3828];
+      BankTile := [6036, 3796];
+    end
+  else if (Location = 'HOSIDIUS') then
+    begin
+      OvenTile := [2100, 1972];
+      BankTile := [2092, 2000];
+    end
+  else
+    TerminateScript('Tried to start without a supported location.');
 end;
 
 procedure Cook();
 var
-  OvenTile: TPoint := [2100, 1972];
   Rect: TRectangle;
   Pt: TPoint;
 begin
@@ -121,7 +136,6 @@ end;
 
 procedure Restock();
 var
-  BankTile: TPoint := [2092, 2000];
   Rect: TRectangle;
   Pt: TPoint;
   BankItem: TRSBankItem := [RawFood, Bank.QUANTITY_ALL, False];
@@ -138,7 +152,7 @@ begin
   WaitEx(250, 25);
   if Bank.ContainsItem(RawFood) then
     Bank.WithdrawItem(BankItem, False)
-  else 
+  else
     TerminateScript('Out of raw food!');
   WaitEx(250, 25);
   Bank.Close(20);
@@ -151,7 +165,7 @@ begin
     begin
       CalculateXP();
       Antiban.DoAntiban();
-      if (not RSClient.IsLoggedIn()) then 
+      if (not RSClient.IsLoggedIn()) then
         Login.LoginPlayer();
       if Inventory.ContainsItem(RawFood) then
         Cook()
