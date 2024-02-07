@@ -7,11 +7,20 @@ begin
   Login.PlayerIndex := 0;
 end;
 
+type
+  COOKLOCATION = (
+      TRAWLER, HOSIDIUS
+  );
+
 var
-  // SUPPORTED LOCATIONS: TRAWLER & HOSIDIUS
-  Location: String := 'TRAWLER';
-  FoodName: String := 'Raw bass';
-  RawFood: TRSItem;
+  Location: COOKLOCATION := COOKLOCATION.TRAWLER;
+  RawFoods: TRSItemArray := [
+                              'Raw anchovies', 'Raw shrimps',
+                              'Raw trout', 'Raw salmon', 'Raw tuna',
+                              'Raw lobster', 'Raw bass', 'Raw swordfish',
+                              'Raw monkfish', 'Raw shark', 'Raw sea turtle',
+                              'Raw manta ray', 'Raw karambwan'
+                            ];
   RSW: TRSWalker;
   Timer: TStopwatch;
   StartXP, CurrentXP, GainedXP: Int32;
@@ -34,24 +43,26 @@ end;
 procedure CalculateXP();
 var t: Int32;
 begin
+  if StartXP = -1 then
+    Exit();
   CurrentXP := XPBar.Read();
   t         := GainedXP;
   GainedXP  := CurrentXP - StartXP;
-  if (GainedXP > t) then
+  if GainedXP > t then
     Timer.Reset();
-  if (Timer.ElapsedTime > 300000) then
-    TerminateScript('No Gained XP in 5 minutes!')
+  if Timer.ElapsedTime > 300000 then
+    TerminateScript('No Gained XP in 5 minutes!');
 end;
 
 procedure PrintProgress();
 begin
   ClearDebug();
   CalculateXP();
-  WriteLn('| --------------------------|');
+  WriteLn('|------------------------|');
   WriteLn('| Runtime   : ', SRL.MsToTime(GetTimeRunning, Time_Short));
   WriteLn('| XP Gained : ', Round(GainedXP/1000, 2), ' K');
   WriteLn('| XP/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
-  WriteLn('| --------------------------|');
+  WriteLn('|------------------------|');
 end;
 
 procedure KeyboardRotate();
@@ -70,11 +81,8 @@ begin
 end;
 
 procedure TAntiban.DoLoseFocus();
-Var T: Int32;
 begin
-  T := SRL.NormalRange(800,3500);
-  Self.DebugLn('Losing focus for '+SRL.MsToTime(T, Time_Short));
-  Self.LoseFocus(T);
+  Self.LoseFocus(SRL.NormalRange(800,3500));
 end;
 
 procedure SetupAntiBan();
@@ -84,6 +92,7 @@ begin
   Antiban.AddTask(ONE_MINUTE*5,   @Antiban.HoverMSPlayers);
   Antiban.AddTask(ONE_MINUTE*3,   @Antiban.DoLoseFocus);
   Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
+  Antiban.AddTask(ONE_MINUTE*7,   @Antiban.RandomRotate);
   Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
   Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
   Antiban.AddBreak(40 * ONE_MINUTE, 8 * ONE_MINUTE);
@@ -100,18 +109,17 @@ begin
     Login.LoginPlayer();
   WaitUntil(RSClient.IsLoggedIn(), 100, 10000);
   StartXP := XPBar.Read();
-  RawFood := FoodName;
   Timer.Start();
-  if (Location = 'TRAWLER') then
-    begin
-      OvenTile := [6040, 3828];
-      BankTile := [6036, 3796];
-    end
-  else if (Location = 'HOSIDIUS') then
-    begin
-      OvenTile := [2100, 1972];
-      BankTile := [2092, 2000];
-    end
+  if Location = COOKLOCATION.TRAWLER then
+  begin
+    OvenTile := [6040, 3828];
+    BankTile := [6036, 3796];
+  end
+  else if Location = COOKLOCATION.HOSIDIUS then
+  begin
+    OvenTile := [2100, 1972];
+    BankTile := [2092, 2000];
+  end
   else
     TerminateScript('Tried to start without a supported location.');
 end;
@@ -129,49 +137,61 @@ begin
   else
     Exit();
   WaitUntil(Make.IsOpen(), 200, 8000);
-  Make.Select(FoodName, Make.QUANTITY_ALL, True);
-  WaitUntil((not Inventory.ContainsItem(RawFood)), 200, 75000);
+  if not Make.IsOpen() then
+    Exit();
+  Make.Select(0, Make.QUANTITY_ALL, True);
+  WaitUntil((not Inventory.ContainsAny(RawFoods)), 200, 75000);
   PrintProgress();
 end;
 
 procedure Restock();
 var
   Rect: TRectangle;
+  i: Int32;
   Pt: TPoint;
-  BankItem: TRSBankItem := [RawFood, Bank.QUANTITY_ALL, False];
+  BankItem: TRSBankItem;
 begin
   Rect := RSW.GetTileMS(BankTile, 2).Expand(-2);
   Pt := SRL.rowp(Rect.Mean(), Rect.Bounds());
   Mouse.HumanMove(Pt);
+  WaitEx(75, 55);
   if Mainscreen.IsUpText('Bank') then
     Mouse.Click(MOUSE_LEFT)
   else
     Exit();
   WaitUntil(Bank.IsOpen(), 200, 8000);
+  if not Bank.IsOpen() then
+    Exit();
   Bank.DepositAll();
-  WaitEx(250, 25);
-  if Bank.ContainsItem(RawFood) then
-    Bank.WithdrawItem(BankItem, False)
-  else
-    TerminateScript('Out of raw food!');
-  WaitEx(250, 25);
+  WaitEx(250, 125);
+  for i := 0 to High(RawFoods) do
+  begin
+    if Bank.ContainsItem(RawFoods[i]) then
+    begin
+      BankItem := [RawFoods[i], Bank.QUANTITY_ALL, False];
+      Bank.WithdrawItem(BankItem, False);
+      Break;
+    end;
+  end;
+  WaitEx(250, 225);
   Bank.Close(20);
-  WaitEx(250, 25);
+  WaitEx(250, 225);
+  if not Inventory.ContainsAny(RawFoods) then
+    TerminateScript('Out of raw food!');
 end;
 
 begin
   InitiateScript();
   repeat
     begin
-      CalculateXP();
       Antiban.DoAntiban();
-      if (not RSClient.IsLoggedIn()) then
+      if not RSClient.IsLoggedIn() then
         Login.LoginPlayer();
-      if Inventory.ContainsItem(RawFood) then
+      if Inventory.ContainsAny(RawFoods) then
         Cook()
       else
         Restock();
-      WaitEx(250, 25);
+      WaitEx(225, 200);
     end;
   until false;
 end.
