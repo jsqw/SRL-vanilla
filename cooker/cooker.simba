@@ -43,14 +43,14 @@ end;
 procedure CalculateXP();
 var t: Int32;
 begin
-  if StartXP = -1 then
+  if (StartXP = -1) then
     Exit();
   CurrentXP := XPBar.Read();
   t         := GainedXP;
   GainedXP  := CurrentXP - StartXP;
-  if GainedXP > t then
+  if (GainedXP > t) then
     Timer.Reset();
-  if Timer.ElapsedTime > 300000 then
+  if (Timer.ElapsedTime > 300000) then
     TerminateScript('No Gained XP in 5 minutes!');
 end;
 
@@ -58,11 +58,11 @@ procedure PrintProgress();
 begin
   ClearDebug();
   CalculateXP();
-  WriteLn('|------------------------|');
+  WriteLn('|--------------------------|');
   WriteLn('| Runtime   : ', SRL.MsToTime(GetTimeRunning, Time_Short));
   WriteLn('| XP Gained : ', Round(GainedXP/1000, 2), ' K');
   WriteLn('| XP/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
-  WriteLn('|------------------------|');
+  WriteLn('|--------------------------|');
 end;
 
 procedure KeyboardRotate();
@@ -81,8 +81,11 @@ begin
 end;
 
 procedure TAntiban.DoLoseFocus();
+Var T: Int32;
 begin
-  Self.LoseFocus(SRL.NormalRange(800,3500));
+  T := SRL.NormalRange(800,3500);
+  Self.DebugLn('Losing focus for '+SRL.MsToTime(T, Time_Short));
+  Self.LoseFocus(T);
 end;
 
 procedure SetupAntiBan();
@@ -92,7 +95,6 @@ begin
   Antiban.AddTask(ONE_MINUTE*5,   @Antiban.HoverMSPlayers);
   Antiban.AddTask(ONE_MINUTE*3,   @Antiban.DoLoseFocus);
   Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
-  Antiban.AddTask(ONE_MINUTE*7,   @Antiban.RandomRotate);
   Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
   Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
   Antiban.AddBreak(40 * ONE_MINUTE, 8 * ONE_MINUTE);
@@ -163,7 +165,7 @@ begin
   if not Bank.IsOpen() then
     Exit();
   Bank.DepositAll();
-  WaitEx(250, 125);
+  WaitEx(250, 25);
   for i := 0 to High(RawFoods) do
   begin
     if Bank.ContainsItem(RawFoods[i]) then
@@ -173,11 +175,9 @@ begin
       Break;
     end;
   end;
-  WaitEx(250, 225);
+  WaitEx(250, 25);
   Bank.Close(20);
-  WaitEx(250, 225);
-  if not Inventory.ContainsAny(RawFoods) then
-    TerminateScript('Out of raw food!');
+  WaitEx(250, 25);
 end;
 
 begin
