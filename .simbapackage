@@ -7,4 +7,4 @@ extract_in_directory=false
 // collapse top level folders
 collapse=true
 // files not to install
-blacklist=.git,.gitignore,.simbapackage,.gitattributes
+blacklist=.git,.gitignore,.simbapackage,.gitattributes,readme.md

@@ -1,9 +1,39 @@
-### SRL-vanilla
+## SRL-vanilla
 
 Scripts made with SRL and WaspLib for the vanilla OSRS client.
 
-### Thanks to:
+## Script list:
 
-- Torwent (waspscripts.com, SRL-T and WaspLib)
-- Slacky (answering my questions, work towards SRL)
-- Flight (tutorials on villavu and helping with questions)
+### camdozaal:
+
+Fishes, prepares and offers fish at the Ruins of Camdozaal for fishing, cooking and prayer experience.
+
+### cooker:
+
+Progressively trains cooking at Hosidius kitchen or at the Fishing Trawler.
+
+### cwars:
+
+AFKs the Castle Wars minigame for the reward tickets.
+
+### finds:
+
+Picks up and cleans unidentified finds at the Varrock Museum for XP lamps.
+
+### gnome-course:
+
+Trains agility at the Gnome Course.
+
+### lunarspinner:
+
+Spins flax at the Castle Wars bank chest, using the Lunar spellbook.
+
+### rcer:
+
+Crafts blood runes at the Kourend altar.
+
+## Thanks to:
+
+- Torwent (www.waspscripts.com)
+- Slacky
+- Flight
