@@ -4,7 +4,8 @@ program cooker;
 {$DEFINE FORMS_V2}
 
 begin
-  Login.PlayerIndex := 0;
+  Login.PlayerIndex := 1;
+  ItemFinder.Similarity := 0.999999;
 end;
 
 type
@@ -192,6 +193,7 @@ begin
       else
         Restock();
       WaitEx(225, 200);
+      PrintProgress();
     end;
   until false;
 end.
