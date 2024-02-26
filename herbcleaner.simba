@@ -5,10 +5,12 @@ program cleaner;
 
 begin
   Login.PlayerIndex := 0;
+  Mouse.Speed := SRL.NormalRange(17, 25);
 end;
-
-var
-  BankTile: TPoint := [2628, 2192]; //currently works only in tithe farm vinery bank
+                                 ava
+  // currently works only in tithe farm vinery bank
+  // fishing trawler bank tile is [6036, 3796];
+  BankTile: TPoint := [2628, 2192];
   GrimyHerbs: TRSItemArray := [
                               'Grimy guam leaf', 'Grimy marrentill',
                               'Grimy tarromin', 'Grimy harralander',
@@ -54,7 +56,6 @@ begin
   WriteLn('|--------------------------|');
   WriteLn('| Runtime   : ', SRL.MsToTime(GetTimeRunning, Time_Short));
   WriteLn('| XP Gained : ', Round(GainedXP/1000, 2), ' K');
-  WriteLn('| XP/hr     : ', Round((GainedXP/1000)/(GetTimeRunning/3600000), 2), ' K');
   WriteLn('|--------------------------|');
 end;
 
@@ -148,6 +149,7 @@ begin
   WaitEx(250, 25);
   Bank.Close(20);
   WaitEx(250, 25);
+  PrintProgress();
 end;
 
 begin
