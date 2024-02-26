@@ -7,7 +7,7 @@ begin
   Login.PlayerIndex := 0;
   Mouse.Speed := SRL.NormalRange(17, 25);
 end;
-                                 ava
+                                 
   // currently works only in tithe farm vinery bank
   // fishing trawler bank tile is [6036, 3796];
   BankTile: TPoint := [2628, 2192];
