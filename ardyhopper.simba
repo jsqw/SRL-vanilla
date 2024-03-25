@@ -1,0 +1,539 @@
+program ardougnehopper;
+{$DEFINE SRL_USE_REMOTEINPUT}
+{$I WaspLib/osr.simba}
+{$DEFINE FORMS_V2}
+{$IFNDEF CJ_BIRDHOUSE_RUNNER}
+  {$I ..\Includes\BHI.simba}
+{$ENDIF}
+
+begin
+  Login.PlayerIndex := 0;
+end;
+
+const
+  BREAKAFTER  = 40;
+  BREAKFOR    = 5;
+  FOODNAME   = 'Lobster';
+
+  BIRDHOUSES  = True;
+  INTERVAL    = ONE_HOUR;
+  SEED        = 'Potato seed';
+
+type
+  TObstacle = record
+    Index: Int32;
+    Tile: TPoint;
+    UpText: TStringArray;
+    Area: TBox;
+    Color: TCTS2Color;
+  end;
+
+var
+  RSW: TRSWalker;
+  Timer: TStopwatch;
+  StartXP, CurrentXP, GainedXP, MinHP, Marks, Step: Int32;
+  Obstacles: Array [0..6] of TObstacle;
+  Food: TRSItem;
+  BankObject: TRSObject;
+  ReturnSpell: ERSSpell;
+  RuneArray: TRSItemArray;
+  Logs: ERSLogType;
+
+procedure PauseTimer(Task: PBreakTask);
+var T: PBreakTask;
+begin
+  Timer.Pause;
+  T := Task;
+end;
+
+procedure ResumeTimer(Task: PBreakTask);
+var T: PBreakTask;
+begin
+  Timer.Resume;
+  T := Task;
+end;
+
+procedure CalculateXP();
+var t: Int32;
+begin
+  if StartXP = -1 then
+    Exit();
+  CurrentXP := XPBar.Read();
+  t         := GainedXP;
+  GainedXP  := CurrentXP - StartXP;
+  if GainedXP > t then
+    Timer.Reset();
+  if Timer.ElapsedTime > 300000 then
+    TerminateScript('No Gained XP in 5 minutes!');
+end;
+
+procedure PrintProgress();
+var
+  hrs: Double;
+  s1, s3: String;
+begin
+  CalculateXP();
+  ClearDebug();
+  hrs := (GetTimeRunning()/3600000);
+  s1 := ToStr(Round((GainedXP/1000), 0), ' k ');
+  s3 := ToStr('(', Round((GainedXP/(hrs*1000)), 1), ' k / hr)');
+
+  WriteLn('|-----------------------------------|');
+  WriteLn('| Ardougne Hopper                   |');
+  WriteLn('|-----------------------------------|');
+  WriteLn('| Experience : ', s1, s3);
+  WriteLn('| Runtime    : ', SRL.MsToTime(GetTimeRunning, Time_Short));
+  WriteLn('| MoG picked : ', Marks);
+
+  if BIRDHOUSES then
+  begin
+    WriteLn('| BH Runs    : ', BirdHouseRunner.RunsCompleted );
+  end;
+
+  WriteLn('|-----------------------------------|');
+
+end;
+
+procedure KeyboardRotate();
+var
+  Arrow: Integer;
+  Duration: Int64;
+begin
+  if SRL.Dice(50) then
+    Arrow := $25
+  else
+    Arrow := $27;
+  Duration := SRL.NormalRange(250, 2250);
+  Keyboard.KeyDown(Arrow);
+  Sleep(Duration);
+  Keyboard.KeyUp(Arrow);
+end;
+
+procedure HealthManagement();
+begin
+  if not RSClient.IsLoggedIn() then
+    Exit();
+  if Minimap.GetHPLevel() < MinHP then
+    begin
+      if Inventory.ContainsItem(Food) then
+        Inventory.ClickItem(Food)
+      else
+        TerminateScript('Could not eat food, possible out of it?');
+    end;
+end;
+
+procedure TAntiban.DoLoseFocus();
+Var T: Int32;
+begin
+  T := SRL.NormalRange(800,3500);
+  Self.LoseFocus(T);
+end;
+
+function TRectangle.RandomMean(): TPoint;
+var
+  centerX, centerY, randX, randY: Double;
+begin
+  centerX := Self.Mean().X;
+  centerY := Self.Mean().Y;
+
+  randX := Self.Left.X + Random * (Self.Right.X - Self.Left.X);
+  randY := Self.Top.Y + Random * (Self.Btm.Y - Self.Top.Y);
+
+  Result.X := Trunc((centerX + randX) / 2);
+  Result.Y := Trunc((centerY + randY) / 2);
+end;
+
+procedure SetupAntiban();
+begin
+  Antiban.Skills := [ERSSKILL.AGILITY, ERSSKILL.TOTAL];
+  Antiban.AddTask(ONE_MINUTE*2,   @Mouse.RandomMovement);
+  Antiban.AddTask(ONE_MINUTE*6,   @Antiban.HoverMSPlayers);
+  Antiban.AddTask(ONE_MINUTE*3,   @Antiban.DoLoseFocus);
+  Antiban.AddTask(ONE_MINUTE*7,   @Antiban.RandomRotate);
+  Antiban.AddTask(ONE_MINUTE*7,   @KeyboardRotate);
+  Antiban.AddTask(ONE_MINUTE*8,   @Antiban.HoverMSNPCs);
+  Antiban.AddTask(ONE_MINUTE*25,  @Antiban.HoverSkills);
+  Antiban.AddBreak(BREAKAFTER * ONE_MINUTE, BREAKFOR * ONE_MINUTE, 0.3, 1);
+  Antiban.OnStartBreak := @PauseTimer;
+  Antiban.OnFinishBreak := @ResumeTimer;
+end;
+
+procedure InitiateScript();
+begin
+  if not RSClient.IsLoggedIn() then
+    Login.LoginPlayer();
+  WaitUntil(RSClient.IsLoggedIn(), 250, 12000);
+
+  Options.SetNPCAttackOption(ERSAttackOption.HIDDEN);
+  Options.SetZoomLevel(Random(0, 6));
+
+  if BIRDHOUSES then
+  begin
+    Logs := BirdHouseRunner.GetLogForHunterLevel(Stats.GetLevel(ERSSkill.HUNTER, False));
+    WriteLn('Logtype for birdhouses based on level: ', ToStr(Logs));
+    BirdHouseRunner.Setup(Logs, SEED, False, INTERVAL, False);
+    BirdHouseRunner.Init();
+  end;
+
+  RSW.SetupRegions([[5600, 3000, 6500, 3500], [500, 5000, 800, 5200]]);
+  SetupAntiban();
+
+  BankObject.SetupUpText(['Bank','Bank booth']);
+  BankObject.Setup(6, [[6016, 3304]]);
+  BankObject.Finder.Colors += CTS2(6251367, 1, 1.67, 1.48);
+  RuneArray := ['Law rune', 'Water rune'];
+  ReturnSpell := ERSSpell.ARDOUGNE_TELEPORT;
+
+  Mouse.Speed := SRL.NormalRange(12, 18);
+  Food := FOODNAME;
+
+  with Obstacles[0] do
+  begin
+    Index := 0;
+    Tile := [6084, 3256];
+    UpText := ['p Wo', 'den Be', 'Wooden', 'Beams'];
+    Area := [5892, 3114, 6162, 3382];
+  end;
+  with Obstacles[1] do
+  begin
+    Index := 1;
+    Tile := [718, 5118];
+    UpText := ['ump', 'Gap'];
+    Area := [715, 5113, 734, 5170];
+  end;
+  with Obstacles[2] do
+  begin
+    Index := 2;
+    Tile := [682, 5086];
+    Color := CTS2(6058880, 8, 0.07, 0.05);
+    UpText := ['lk-on', 'Plan'];
+    Area := [677, 5080, 709, 5097];
+  end;
+  with Obstacles[3] do
+  begin
+    Index := 3;
+    Tile := [648, 5088];
+    UpText := ['ump', 'Gap'];
+    Area := [648, 5080, 675, 5096];
+  end;
+  with Obstacles[4] do
+  begin
+    Index := 4;
+    Tile := [648, 5122];
+    UpText := ['ump', 'Gap'];
+    Area := [643, 5100, 656, 5123];
+  end;
+  with Obstacles[5] do
+  begin
+    Index := 5;
+    Tile := [652, 5159];
+    UpText := ['Balance', 'ce-ac', 'Steep', 'eep ro'];
+    Area := [636, 5120, 664, 5164];
+  end;
+  with Obstacles[6] do
+  begin
+    Index := 6;
+    Tile := [662, 5174];
+    UpText := ['ump', 'Gap'];
+    Area := [647, 5168, 673, 5181];
+  end;
+
+  StartXP := XPBar.Read();
+  Timer.Start();
+end;
+
+// From Flight's pollniv hopper:
+// https://villavu.com/forum/showthread.php?t=118100
+procedure HighlightRect(Rect: TRectangle; Color, Opacity: Integer);
+var
+  RR,RG,RB,
+  R,G,B,i: Integer;
+  Pts: TPointArray;
+  Cols: TIntegerArray;
+begin
+  ColorToRGB(Color, RR, RG, RB);
+  try
+    Pts := TPAFromPolygon(Rect.ToTPA);
+    Cols := GetColors(Pts);
+
+    for i:=0 to high(Cols) do
+    begin
+      ColorToRGB(Cols[i], R, G, B);
+      R := Round(0.01 * (Opacity * R + (100 - Opacity) * RR));
+      G := Round(0.01 * (Opacity * G + (100 - Opacity) * RG));
+      B := Round(0.01 * (Opacity * B + (100 - Opacity) * RB));
+      RSClient.Image.DrawTPA([Pts[i]], RGBtoColor(R,G,B));
+    end;
+  except
+  end;
+end;
+
+function GetStep(): Int32;
+var
+  Pos: TPoint;
+  i: Int32;
+begin
+  if Mainscreen.HasInterface() then
+    Mainscreen.CloseInterface(50);
+
+  Pos := RSW.GetMyPos();
+  for i := 0 to High(Obstacles) do
+    if Obstacles[i].Area.Contains(Pos) then
+      Exit(i);
+end;
+
+function FindObstacle(Obs: TObstacle; Height: Int32 = 0): Boolean;
+var
+  Pt: TPoint;
+  MSRect: TRectangle;
+  TPA: TPointArray;
+  Bds: TBox;
+begin
+  if not RSClient.IsLoggedIn() then
+    Exit();
+
+  MSRect := RSW.GetTileMS(Obs.Tile, Height);
+  Bds := MSRect.Bounds().Expand(2);
+
+  if not Mainscreen.Bounds.Contains(Bds) then
+    Exit(False);
+
+  HighlightRect(MSRect, 9442932, 70);
+
+  if Obs.Color.Color <> 0 then
+  begin
+    SRL.FindColors(TPA, Obs.Color, Bds);
+
+    if TPA.Len() < 1 then
+      Exit(False);
+
+    for 1 to SRL.NormalRange(2, 4) do
+    begin
+      Pt := TPA.RandomValue();
+      Mouse.HumanMove(Pt);
+      if Mainscreen.IsUpText(Obs.UpText, 175) then
+        Exit(True);
+    end;
+
+  end else
+  begin
+    for 1 to SRL.NormalRange(2, 4) do
+    begin
+      Pt := MSRect.RandomMean();
+      Mouse.HumanMove(Pt);
+      if Mainscreen.IsUpText(Obs.UpText, 175) then
+        Exit(True);
+    end;
+  end;
+
+  Result := Mainscreen.IsUpText(Obs.UpText, 175);
+end;
+
+procedure GroundStep();
+var
+  Found: Boolean;
+  Pos, StartTile: TPoint;
+begin
+  if not RSClient.IsLoggedIn() then
+    Exit();
+
+  if BIRDHOUSES then
+    if BirdHouseRunner.CanDoBirdHouseRun() then
+      BirdHouseRunner.DoBirdHouseRun();
+
+  Found := FindObstacle(Obstacles[0], 2);
+  RSClient.Image.Clear();
+
+  if Found then
+  begin
+    Mouse.Click(MOUSE_LEFT);
+
+    if not Mainscreen.DidRedClick() then
+      Exit();
+
+    XPBar.WaitXP(9750);
+    Exit();
+  end;
+
+  Pos := RSW.GetMyPos();
+  StartTile := [Obstacles[0].Tile.X, Obstacles[0].Tile.Y + 4];
+
+  if Pos.DistanceTo(StartTile) > 32 then
+    RSW.WebWalk(StartTile)
+  else
+  begin
+    if SRL.Dice(50) then
+      KeyboardRotate()
+    else
+      Antiban.RandomRotate();
+  end;
+end;
+
+procedure PickMarks(Step: Int32);
+var
+  MRect: TRectangle;
+  MTPA, Dots: TPointArray;
+  Dot: TPoint;
+  MoGColor: TCTS2Color := CTS2(2141119, 1, 0.01, 0.01);
+  MBds: TBox;
+  MoG: Int32;
+begin
+  WaitEx(555,  225);
+  Dots := Minimap.GetDots(ERSMinimapdot.ITEM);
+  if Dots.Len() > 0 then
+  begin
+    Dot := Dots[0];
+    Dot := RSW.MMToWorld(Dot);
+    if Obstacles[Step].Area.Contains(Dot) then
+    begin
+      MRect := RSW.GetTileMS(Dot).Expand(4);
+      HighlightRect(MRect, 456456, 70);
+      MBds := MRect.Bounds();
+      MBds.LimitTo(Mainscreen.Bounds());
+      SRL.FindColors(MTPA, MoGColor, MBds);
+      if MTPA.Len() > 0 then
+      begin
+        MoG := Inventory.CountItemStack('Mark of grace');
+        Mouse.HumanMove(MTPA.Mean());
+        WaitEx(55, 25);
+        if Mainscreen.IsUpText(['Take M', 'ark of g']) then
+        begin
+          RSClient.Image.Clear();
+          Mouse.Click(MOUSE_LEFT);
+
+          if not WaitUntil(MoG < Inventory.CountItemStack('Mark of grace'), 250, 7500) then
+            Exit();
+
+          Marks += 1;
+          WaitEx(420, 69);
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure NormalStep(Step: Int32);
+var
+  Found: Boolean;
+begin
+  if not RSClient.IsLoggedIn() then
+    Exit();
+
+  if Step = 3 then
+    PickMarks(Step);
+
+  Found := FindObstacle(Obstacles[Step]);
+  RSClient.Image.Clear();
+  if Found then
+  begin
+    Mouse.Click(MOUSE_LEFT);
+
+    if not Mainscreen.DidRedClick() then
+      Exit();
+
+    XPBar.WaitXP(12575);
+  end else
+    KeyboardRotate();
+end;
+
+procedure ScriptLoop();
+begin
+  Antiban.DoAntiban();
+
+  if not RSClient.IsLoggedIn() then
+    Login.LoginPlayer();
+
+  HealthManagement();
+  Step := GetStep();
+  PrintProgress();
+
+  if Step = 0 then
+    GroundStep()
+  else if Step > 0 then
+    NormalStep(Step);
+end;
+
+function TBirdHouseInclude.OnStart() : Boolean; override;
+var
+  i, j: Int32;
+  bankTimeout : TCountdown;
+  FoodBankItem, RuneBankItem: TRSBankItem;
+begin
+  Writeln("Birdhouse Include OnStart");
+
+  for i := 0 to High(Antiban.Tasks) do
+  begin
+    Antiban.Tasks[i].Countdown.Pause();
+  end;
+
+  bankTimeout.Init(65000);
+
+  while not bankTimeOut.IsFinished() and not Bank.IsOpen() do
+  begin
+    BankObject.WalkClick();
+    WaitUntil(Bank.IsOpen(), 250, 2000);
+  end;
+
+  if not Bank.IsOpen() then
+  begin
+    Self.DebugLn("Failed to get to bank");
+    Exit(false);
+  end;
+
+  if Inventory.CountEmptySlots() < 28 then
+  begin
+    Bank.DepositAll();
+    WaitUntil(Inventory.CountEmptySlots() > 25, 150, 2000);
+
+    //If we can't get our stuff then bail
+    if not Self.WithdrawNextRun() then
+    begin
+      Self.DebugLn("Failed to get bank items");
+      Bank.DepositAll();
+      Bank.Close();
+      BirdhouseRunner.IsDisabled := true;
+      Exit(false);
+    end;
+
+    for j := 0 to High(RuneArray) do
+    begin
+      RuneBankItem := TRSBankItem.Setup(RuneArray[j], 10, False);
+      Bank.WithdrawItem(RuneBankItem, False);
+      WaitEx(500, 450);
+    end;
+
+    FoodBankItem := TRSBankItem.Setup(Food, 5, False);
+    Bank.WithDrawItem(FoodBankItem, False);
+
+    WaitEx(325, 250);
+
+    Bank.Close(60);
+  end;
+
+  Result := true;
+end;
+
+procedure TBirdHouseInclude.OnComplete(); override;
+var
+  i: Int32;
+begin
+  Self.DebugLn("Birdhouse Include OnComplete");
+
+  if Magic.CastSpell(ReturnSpell) then
+    WaitEx(6500, 1750);
+
+  for i := 0 to High(Antiban.Tasks) do
+  begin
+    Antiban.Tasks[i].Countdown.Resume();
+  end;
+end;
+
+begin
+  InitiateScript();
+  repeat
+    begin
+      ScriptLoop();
+      WaitEx(250, 225);
+    end;
+  until false;
+end.
